@@ -249,27 +249,8 @@ async def credential_agent(ctx: Context, node_input: Any) -> Event:
 """
 
     def _send_email():
-        try:
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = "Welcome to PES University - Portal Credentials"
-            msg["From"] = SMTP_USERNAME
-            msg["To"] = email
-            msg.attach(MIMEText(html_content, "html"))
-            
-            # Temporary fallback print statement right before connection
-            print(f"[DEBUG SMTP] Destination email address: {email}")
-            
-            print('SMTP Connection Attempting...')
-            # Connect to SMTP with TLS enabled
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-                server.starttls()
-                server.login(SMTP_USERNAME, SMTP_PASSWORD)
-                server.sendmail(SMTP_USERNAME, email, msg.as_string())
-        except Exception as smtp_err:
-            import traceback
-            print(f"[DEBUG SMTP ERROR] SMTP transaction failed for {email}: {smtp_err}")
-            traceback.print_exc()
-            raise smtp_err
+        from app.app_utils.email import send_email
+        send_email(email, "Welcome to PES University - Portal Credentials", html_content, is_html=True)
 
     try:
         await asyncio.to_thread(_send_email)
@@ -379,10 +360,8 @@ async def scheduler_agent(ctx: Context, node_input: Any) -> Event:
 
         logging.info(f"Preparing to send chairperson email for {teacher_name}")
         try:
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = "Interview Appointment Request: New Faculty Onboarding"
-            msg["From"] = SMTP_USERNAME
-            msg["To"] = CHAIRPERSON_EMAIL
+            from app.app_utils.email import send_email
+            from app.core.config import CHAIRPERSON_EMAIL
 
             body = f"""Dear Chairperson,
 
@@ -395,14 +374,8 @@ Please schedule a suitable interview slot.
 
 Best Regards,
 PES University Onboarding System"""
-            msg.attach(MIMEText(body, "plain"))
 
-            if SMTP_PASSWORD != "mock-password":
-                server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
-                server.starttls()
-                server.login(SMTP_USERNAME, SMTP_PASSWORD)
-                server.sendmail(SMTP_USERNAME, CHAIRPERSON_EMAIL, msg.as_string())
-                server.quit()
+            send_email(CHAIRPERSON_EMAIL, "Interview Appointment Request: New Faculty Onboarding", body, is_html=False)
             print(f"Interview request dispatched to Chairperson for {teacher_name}")
         except Exception as e:
             logging.error(f"Failed to email chairperson: {e}")
@@ -463,14 +436,8 @@ async def allotment_approval_gate(ctx: Context, node_input: Any):
 
 
 def _send_idcard(name: str, email: str, department: str = "N/A", designation: str = "N/A"):
-    import smtplib
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-    from app.core.config import SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, IDCARD_EMAIL
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Faculty ID Card Printing Request"
-    msg["From"] = SMTP_USERNAME
-    msg["To"] = IDCARD_EMAIL
+    from app.app_utils.email import send_email
+    from app.core.config import IDCARD_EMAIL
     
     body = (
         f"Dear ID Card Printing Team,\n\n"
@@ -483,32 +450,19 @@ def _send_idcard(name: str, email: str, department: str = "N/A", designation: st
         f"Best Regards,\n"
         f"PES University Onboarding System"
     )
-    msg.attach(MIMEText(body, "plain"))
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-        server.starttls()
-        server.login(SMTP_USERNAME, SMTP_PASSWORD)
-        server.sendmail(SMTP_USERNAME, IDCARD_EMAIL, msg.as_string())
+    send_email(IDCARD_EMAIL, "Faculty ID Card Printing Request", body, is_html=False)
 
 
 def _send_it(name: str, email: str):
-    import smtplib
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-    from app.core.config import SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, IT_EMAIL
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Faculty Network & Workspace Provisioning Request"
-    msg["From"] = SMTP_USERNAME
-    msg["To"] = IT_EMAIL
+    from app.app_utils.email import send_email
+    from app.core.config import IT_EMAIL
+    
     body = (
         f"Please generate campus Wi-Fi credentials and assign an official domain email ID (e.g., username@pes.edu) for:\n"
         f"Teacher Name: {name}\n"
         f"Primary Email: {email}"
     )
-    msg.attach(MIMEText(body, "plain"))
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-        server.starttls()
-        server.login(SMTP_USERNAME, SMTP_PASSWORD)
-        server.sendmail(SMTP_USERNAME, IT_EMAIL, msg.as_string())
+    send_email(IT_EMAIL, "Faculty Network & Workspace Provisioning Request", body, is_html=False)
 
 
 @node(rerun_on_resume=True)

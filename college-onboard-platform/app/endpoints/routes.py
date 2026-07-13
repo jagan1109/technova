@@ -349,11 +349,8 @@ def chatbot_endpoint(req: ChatRequest) -> dict:
     return {"response": answer}
 
 def send_welcome_email_task(email: str, username: str, name: str, password: str):
-    import smtplib
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
+    from app.app_utils.email import send_email
     import logging
-    from app.core.config import SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD
 
     logging.info(f"Preparing to send credentials welcome email to {email}")
 
@@ -388,31 +385,12 @@ def send_welcome_email_task(email: str, username: str, name: str, password: str)
 </body>
 </html>
 """
-
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Welcome to PES University - Portal Credentials"
-        msg["From"] = SMTP_USERNAME
-        msg["To"] = email
-        msg.attach(MIMEText(html_content, "html"))
-        
-        print(f"[DEBUG SMTP] Destination email address: {email}")
-        print('SMTP Connection Attempting...')
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-            server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SMTP_USERNAME, email, msg.as_string())
-        logging.info(f"Successfully dispatched welcome email to {email}")
-    except Exception as e:
-        logging.error(f"Failed to dispatch welcome email to {email}: {e}")
+    send_email(email, "Welcome to PES University - Portal Credentials", html_content, is_html=True)
 
 
 def send_verification_email_task(email: str, name: str):
-    import smtplib
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
+    from app.app_utils.email import send_email
     import logging
-    from app.core.config import SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD
 
     logging.info(f"Preparing to send verification confirmation email to {email}")
 
@@ -441,39 +419,16 @@ def send_verification_email_task(email: str, name: str):
 </body>
 </html>
 """
-
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Documents Verified - PES University Onboarding"
-        msg["From"] = SMTP_USERNAME
-        msg["To"] = email
-        msg.attach(MIMEText(html_content, "html"))
-        
-        print(f"[DEBUG SMTP] Destination email address: {email}")
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-            server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SMTP_USERNAME, email, msg.as_string())
-        logging.info(f"Successfully dispatched verification email to {email}")
-    except Exception as e:
-        logging.error(f"Failed to dispatch verification email to {email}: {e}")
+    send_email(email, "Documents Verified - PES University Onboarding", html_content, is_html=True)
 
 
 def send_chairperson_email_task(teacher_email: str, teacher_name: str):
-    import smtplib
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
+    from app.app_utils.email import send_email
+    from app.core.config import CHAIRPERSON_EMAIL
     import logging
-    from app.core.config import SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, CHAIRPERSON_EMAIL
 
     logging.info(f"Preparing to send chairperson email for {teacher_name}")
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Interview Appointment Request: New Faculty Onboarding"
-        msg["From"] = SMTP_USERNAME
-        msg["To"] = CHAIRPERSON_EMAIL
-
-        body = f"""Dear Chairperson,
+    body = f"""Dear Chairperson,
 
 An interview appointment request has been made for a new faculty member's onboarding.
 
@@ -484,33 +439,17 @@ Please schedule a suitable interview slot.
 
 Best Regards,
 PES University Onboarding System"""
-        msg.attach(MIMEText(body, "plain"))
-        
-        print(f"[DEBUG SMTP] Destination email address: {CHAIRPERSON_EMAIL}")
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-            server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SMTP_USERNAME, CHAIRPERSON_EMAIL, msg.as_string())
-        logging.info(f"Successfully dispatched chairperson email for {teacher_name}")
-    except Exception as e:
-        logging.error(f"Failed to email chairperson: {e}")
+    send_email(CHAIRPERSON_EMAIL, "Interview Appointment Request: New Faculty Onboarding", body, is_html=False)
 
 
 def send_provisioning_emails_task(email: str, name: str, department: str = "N/A", designation: str = "N/A"):
-    import smtplib
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
+    from app.app_utils.email import send_email
+    from app.core.config import IDCARD_EMAIL, IT_EMAIL
     import logging
-    from app.core.config import SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, IDCARD_EMAIL, IT_EMAIL
 
     logging.info(f"Preparing to send provisioning emails for {name}")
     try:
         # 1. ID Card Printing Email
-        msg_id = MIMEMultipart("alternative")
-        msg_id["Subject"] = "Faculty ID Card Printing Request"
-        msg_id["From"] = SMTP_USERNAME
-        msg_id["To"] = IDCARD_EMAIL
-        
         body_id = (
             f"Dear ID Card Printing Team,\n\n"
             f"Please process the printing of a new Faculty ID Card for the newly onboarded faculty member:\n\n"
@@ -522,32 +461,16 @@ def send_provisioning_emails_task(email: str, name: str, department: str = "N/A"
             f"Best Regards,\n"
             f"PES University Onboarding System"
         )
-        msg_id.attach(MIMEText(body_id, "plain"))
-
-        print(f"[DEBUG SMTP] Sending ID Card printing request email to: {IDCARD_EMAIL}")
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-            server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SMTP_USERNAME, IDCARD_EMAIL, msg_id.as_string())
+        send_email(IDCARD_EMAIL, "Faculty ID Card Printing Request", body_id, is_html=False)
         
         # 2. IT Department Email
-        msg_it = MIMEMultipart("alternative")
-        msg_it["Subject"] = "Faculty Network & Workspace Provisioning Request"
-        msg_it["From"] = SMTP_USERNAME
-        msg_it["To"] = IT_EMAIL
         body_it = (
             f"Please generate campus Wi-Fi credentials and assign an official domain email ID (e.g., username@pes.edu) for:\n"
             f"Teacher Name: {name}\n"
             f"Primary Email: {email}"
         )
-        msg_it.attach(MIMEText(body_it, "plain"))
-
-        print(f"[DEBUG SMTP] Sending IT network provisioning request email to: {IT_EMAIL}")
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-            server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SMTP_USERNAME, IT_EMAIL, msg_it.as_string())
-
+        send_email(IT_EMAIL, "Faculty Network & Workspace Provisioning Request", body_it, is_html=False)
+        
         print(f"Provisioning emails dispatched for {name}")
     except Exception as e:
         logging.error(f"Failed to send provisioning emails for {name}: {e}")
