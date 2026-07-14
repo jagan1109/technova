@@ -62,7 +62,7 @@ async def upload_document_endpoint(
             res = client.storage.from_("documents").upload(
                 path=file_path,
                 file=file_bytes,
-                file_options={"cache-control": "3600", "upsert": "true"}
+                file_options={"cache-control": "3600", "upsert": "true", "content-type": "application/pdf"}
             )
             file_url = client.storage.from_("documents").get_public_url(file_path)
         except Exception as e:
