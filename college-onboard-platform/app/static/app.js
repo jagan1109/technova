@@ -1475,10 +1475,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Seating Allotment Modal Logic
 let activeSeatingUsername = null;
-let activeSeatingRoom = '35';
+let activeSeatingRoom = '101';
 
-const SEATING_ROOMS = ['35', '36', '37', '38', '39', '40', '41', '42'];
-const SEATING_DESKS = ['25', '26', '27', '28', '29'];
+const SEATING_ROOMS = ['101', '102', '201', '202', '301', '302', '401', '402'];
 
 window.openSeatingModal = function(username) {
     activeSeatingUsername = username;
@@ -1548,65 +1547,63 @@ function renderSeatingModalSeats() {
         if (t.seating_info && t.seating_info.startsWith(`Room ${activeSeatingRoom},`)) {
             const parts = t.seating_info.split(', ');
             if (parts.length > 1) {
-                const seatInfo = parts[1].replace('Desk ', '').trim();
+                const seatInfo = parts[1].replace('Seat ', '').replace('Desk ', '').trim();
                 occupiedSeats[seatInfo] = t.name;
             }
         }
     });
     
-    // Generate 6 rows, each having 5 columns corresponding to SEATING_DESKS
-    for (let row = 1; row <= 6; row++) {
-        SEATING_DESKS.forEach(deskNum => {
-            const seatKey = `${deskNum}-${row}`;
-            const occupiedBy = occupiedSeats[seatKey];
+    // Generate 16 seats
+    for (let seatNum = 1; seatNum <= 16; seatNum++) {
+        const seatKey = String(seatNum);
+        const occupiedBy = occupiedSeats[seatKey];
+        
+        const cell = document.createElement('div');
+        cell.innerText = seatKey;
+        cell.style.display = 'flex';
+        cell.style.alignItems = 'center';
+        cell.style.justifyContent = 'center';
+        cell.style.height = '60px';
+        cell.style.borderRadius = '8px';
+        cell.style.fontWeight = '600';
+        cell.style.fontSize = '1.1rem';
+        cell.style.transition = 'all 0.2s ease';
+        
+        if (occupiedBy) {
+            // Occupied seat styling (grey background, grey text, not clickable)
+            cell.style.background = 'rgba(255, 255, 255, 0.05)';
+            cell.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+            cell.style.color = 'rgba(255, 255, 255, 0.25)';
+            cell.style.cursor = 'not-allowed';
+            cell.title = `Occupied by ${occupiedBy}`;
+        } else {
+            // Available seat styling (green border/outline, dark background)
+            cell.style.background = 'rgba(46, 160, 67, 0.03)';
+            cell.style.border = '2px solid #2ea043';
+            cell.style.color = '#2ea043';
+            cell.style.cursor = 'pointer';
+            cell.title = `Seat ${seatKey} (Available)`;
             
-            const cell = document.createElement('div');
-            cell.innerText = deskNum;
-            cell.style.display = 'flex';
-            cell.style.alignItems = 'center';
-            cell.style.justifyContent = 'center';
-            cell.style.height = '50px';
-            cell.style.borderRadius = '6px';
-            cell.style.fontWeight = '600';
-            cell.style.fontSize = '0.95rem';
-            cell.style.transition = 'all 0.2s ease';
-            
-            if (occupiedBy) {
-                // Occupied seat styling (grey background, grey text, not clickable)
-                cell.style.background = 'rgba(255, 255, 255, 0.05)';
-                cell.style.border = '1px solid rgba(255, 255, 255, 0.08)';
-                cell.style.color = 'rgba(255, 255, 255, 0.25)';
-                cell.style.cursor = 'not-allowed';
-                cell.title = `Occupied by ${occupiedBy}`;
-            } else {
-                // Available seat styling (green border/outline, dark background)
+            cell.addEventListener('mouseover', () => {
+                cell.style.background = 'rgba(46, 160, 67, 0.15)';
+                cell.style.color = '#fff';
+            });
+            cell.addEventListener('mouseout', () => {
                 cell.style.background = 'rgba(46, 160, 67, 0.03)';
-                cell.style.border = '2px solid #2ea043';
                 cell.style.color = '#2ea043';
-                cell.style.cursor = 'pointer';
-                cell.title = `Seat ${seatKey} (Available)`;
-                
-                cell.addEventListener('mouseover', () => {
-                    cell.style.background = 'rgba(46, 160, 67, 0.15)';
-                    cell.style.color = '#fff';
-                });
-                cell.addEventListener('mouseout', () => {
-                    cell.style.background = 'rgba(46, 160, 67, 0.03)';
-                    cell.style.color = '#2ea043';
-                });
-                
-                cell.addEventListener('click', async () => {
-                    await selectSeat(activeSeatingRoom, seatKey);
-                });
-            }
-            grid.appendChild(cell);
-        });
+            });
+            
+            cell.addEventListener('click', async () => {
+                await selectSeat(activeSeatingRoom, seatKey);
+            });
+        }
+        grid.appendChild(cell);
     }
 }
 
 async function selectSeat(room, seatKey) {
     if (!activeSeatingUsername) return;
-    const seatDesc = `Room ${room}, Desk ${seatKey}`;
+    const seatDesc = `Room ${room}, Seat ${seatKey}`;
     
     // Save original state for rollback
     const originalSeating = systemState.teachers[activeSeatingUsername].seating_info;
