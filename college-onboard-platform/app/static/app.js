@@ -411,9 +411,20 @@ function updateDashboardView() {
 
         let pendingTeachersCount = 0;
 
-        Object.keys(systemState.teachers).forEach(uname => {
-            const t = systemState.teachers[uname];
-            
+        const teachersArray = Object.keys(systemState.teachers).map(uname => {
+            return { username: uname, ...systemState.teachers[uname] };
+        });
+
+        // Sort alphabetically by name (case-insensitive)
+        teachersArray.sort((a, b) => {
+            const nameA = (a.name || '').toLowerCase();
+            const nameB = (b.name || '').toLowerCase();
+            if (nameA < nameB) return -1;
+            if (nameA > nameB) return 1;
+            return 0;
+        });
+
+        teachersArray.forEach(t => {
             // Count teachers waiting for verification
             const docStatuses = t.document_statuses || {};
             const docPaths = t.document_paths || {};
@@ -445,7 +456,7 @@ function updateDashboardView() {
                 // Trigger Edit profile click
                 div.querySelector('.edit-profile-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
-                    openEditDrawer(t.username);
+                    openEditDrawer(t.username, div);
                 });
                 teachersListContainer.appendChild(div);
             }
@@ -748,9 +759,14 @@ const editDrawer = document.getElementById('hr-edit-drawer');
 const closeDrawerBtn = document.getElementById('close-drawer-btn');
 closeDrawerBtn.addEventListener('click', () => editDrawer.classList.add('hidden'));
 
-function openEditDrawer(username) {
+function openEditDrawer(username, cardElement) {
     const t = systemState.teachers[username];
     if (!t) return;
+
+    // Move editDrawer right after the teacher's card element in the DOM
+    if (cardElement && editDrawer) {
+        cardElement.parentNode.insertBefore(editDrawer, cardElement.nextSibling);
+    }
 
     document.getElementById('edit-username').value = username;
     document.getElementById('edit-name').value = t.name;

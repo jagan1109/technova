@@ -5,11 +5,21 @@ import json
 import os
 import datetime
 import secrets
+import re
 from app.core.privacy import DataMaskingMiddleware
 from app.core.local_storage import LocalStateStore
 
 
 router = APIRouter()
+
+def clean_and_capitalize_name(name: str) -> str:
+    if not name:
+        return ""
+    name_clean = name.replace(".", " ")
+    name_clean = re.sub(r'\s+', ' ', name_clean).strip()
+    words = name_clean.split(" ")
+    capitalized_words = [w.capitalize() for w in words if w]
+    return " ".join(capitalized_words)
 
 class ChatRequest(BaseModel):
     message: str
@@ -500,7 +510,7 @@ def trigger_action(req: ActionRequest, background_tasks: BackgroundTasks) -> dic
         if username in state["teachers"]:
             raise HTTPException(status_code=400, detail="Teacher with this email already exists.")
         
-        name = payload.get("name")
+        name = clean_and_capitalize_name(payload.get("name"))
         password = secrets.token_urlsafe(10)
 
         state["teachers"][username] = {
@@ -535,7 +545,7 @@ def trigger_action(req: ActionRequest, background_tasks: BackgroundTasks) -> dic
             raise HTTPException(status_code=404, detail="Teacher not found.")
         
         state["teachers"][username].update({
-            "name": payload.get("name"),
+            "name": clean_and_capitalize_name(payload.get("name")),
             "email": payload.get("email"),
             "department": payload.get("department"),
             "designation": payload.get("designation"),
