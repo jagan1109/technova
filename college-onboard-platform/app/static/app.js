@@ -100,7 +100,7 @@ async function authenticate(username, password) {
             adminMenu.classList.remove('hidden');
             roleBadge.innerText = 'Chairperson / Admin';
             roleBadge.className = 'badge badge-danger';
-            announcementsSidebar.classList.add('hidden');
+            announcementsSidebar.classList.remove('hidden');
             switchTab('admin-seating-allotment');
         }
 
@@ -237,6 +237,17 @@ function updateDashboardView() {
     sortedAnn.forEach(ann => {
         const annDiv = document.createElement('div');
         annDiv.className = 'ann-item';
+        
+        let actionButtons = '';
+        if (currentRole === 'admin') {
+            actionButtons = `
+                <div class="ann-actions" style="margin-top: 8px; display: flex; gap: 8px; justify-content: flex-end;">
+                    <button class="btn btn-secondary btn-sm" onclick="editAnnouncement(${ann.id}, '${ann.title.replace(/'/g, "\\'")}', '${ann.content.replace(/'/g, "\\'")}')" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; display: flex; align-items: center; gap: 2px;">✏️ Edit</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteAnnouncement(${ann.id})" style="padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; display: flex; align-items: center; gap: 2px;">🗑️ Delete</button>
+                </div>
+            `;
+        }
+
         annDiv.innerHTML = `
             <h4>${ann.title}</h4>
             <p>${ann.content}</p>
@@ -244,6 +255,7 @@ function updateDashboardView() {
                 <span>By: ${ann.sender}</span>
                 <span>Date: ${ann.date}</span>
             </div>
+            ${actionButtons}
         `;
         annListView.appendChild(annDiv);
     });
@@ -404,6 +416,14 @@ function updateDashboardView() {
     // 3. Render HR Views
     if (currentRole === 'hr') {
         const teachersListContainer = document.getElementById('hr-teachers-list-view');
+        const editDrawer = document.getElementById('hr-edit-drawer');
+        const tabHrTeachersList = document.getElementById('tab-hr-teachers-list');
+
+        // Safely preserve the editDrawer in the DOM before container is cleared
+        if (editDrawer && tabHrTeachersList && editDrawer.parentNode !== tabHrTeachersList) {
+            tabHrTeachersList.appendChild(editDrawer);
+        }
+
         if (teachersListContainer) teachersListContainer.innerHTML = '';
 
         const hrSearchInput = document.getElementById('hr-search-teacher');
@@ -444,6 +464,7 @@ function updateDashboardView() {
             if (teachersListContainer && matchesQuery) {
                 const div = document.createElement('div');
                 div.className = 'teacher-card-item';
+                div.setAttribute('data-username', t.username);
                 div.innerHTML = `
                     <div class="teacher-card-info">
                         <h4>${t.name} (@${t.username})</h4>
@@ -461,6 +482,17 @@ function updateDashboardView() {
                 teachersListContainer.appendChild(div);
             }
         });
+
+        // Restore editDrawer position if it was open
+        if (editDrawer && !editDrawer.classList.contains('hidden') && teachersListContainer) {
+            const activeUsername = document.getElementById('edit-username').value;
+            if (activeUsername) {
+                const activeCard = teachersListContainer.querySelector(`[data-username="${activeUsername}"]`);
+                if (activeCard) {
+                    activeCard.parentNode.insertBefore(editDrawer, activeCard.nextSibling);
+                }
+            }
+        }
 
         // Update Verification Badge
         const hrVerificationTab = document.getElementById('hr-verification-tab');
@@ -597,7 +629,14 @@ function updateDashboardView() {
             const hasFocus = isTextInput && adminSeatingList.contains(activeInput);
             if (!hasFocus) {
                 adminSeatingList.innerHTML = '';
-                Object.values(systemState.teachers).forEach(t => {
+                const sortedSeatingTeachers = Object.values(systemState.teachers).sort((a, b) => {
+                    const nameA = (a.name || '').toLowerCase();
+                    const nameB = (b.name || '').toLowerCase();
+                    if (nameA < nameB) return -1;
+                    if (nameA > nameB) return 1;
+                    return 0;
+                });
+                sortedSeatingTeachers.forEach(t => {
                     const isAllotted = t.seating_info && t.seating_info !== 'Not Allotted';
                     const isEditing = editingSeating[t.username] === true;
 
@@ -641,8 +680,14 @@ function updateDashboardView() {
             const adminSearchInput = document.getElementById('admin-search-teacher');
             const adminQuery = adminSearchInput ? adminSearchInput.value.trim().toLowerCase() : '';
 
-            Object.keys(systemState.teachers).forEach(uname => {
-                const t = systemState.teachers[uname];
+            const sortedOverviewTeachers = Object.values(systemState.teachers).sort((a, b) => {
+                const nameA = (a.name || '').toLowerCase();
+                const nameB = (b.name || '').toLowerCase();
+                if (nameA < nameB) return -1;
+                if (nameA > nameB) return 1;
+                return 0;
+            });
+            sortedOverviewTeachers.forEach(t => {
 
                 const matchesQuery = !adminQuery || (t.employee_id && t.employee_id.toLowerCase().includes(adminQuery));
 
@@ -747,6 +792,57 @@ window.verifyDoc = async function(username, docName, docType, approved) {
             syncStateData();
         } else {
             alert('Failed to evaluate document');
+        }
+    } catch(err) {
+        console.error(err);
+        alert('Server communication error.');
+    }
+};
+
+window.editAnnouncement = async function(id, currentTitle, currentContent) {
+    const newTitle = prompt("Edit Announcement Title:", currentTitle);
+    if (newTitle === null) return;
+    const newContent = prompt("Edit Announcement Content:", currentContent);
+    if (newContent === null) return;
+    
+    try {
+        const res = await fetch('/api/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'edit_announcement',
+                payload: { id: id, title: newTitle, content: newContent }
+            })
+        });
+        if (res.ok) {
+            alert('Announcement updated successfully!');
+            syncStateData();
+        } else {
+            alert('Failed to update announcement.');
+        }
+    } catch(err) {
+        console.error(err);
+        alert('Server communication error.');
+    }
+};
+
+window.deleteAnnouncement = async function(id) {
+    if (!confirm("Are you sure you want to delete this announcement?")) return;
+    
+    try {
+        const res = await fetch('/api/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'delete_announcement',
+                payload: { id: id }
+            })
+        });
+        if (res.ok) {
+            alert('Announcement deleted successfully!');
+            syncStateData();
+        } else {
+            alert('Failed to delete announcement.');
         }
     } catch(err) {
         console.error(err);

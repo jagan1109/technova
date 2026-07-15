@@ -581,6 +581,32 @@ def trigger_action(req: ActionRequest, background_tasks: BackgroundTasks) -> dic
         state["announcements"].append(new_ann)
         write_log("ADMIN_AGENT", f"New announcement published: '{payload.get('title')}'")
 
+    elif action == "edit_announcement":
+        ann_id = payload.get("id")
+        title = payload.get("title")
+        content = payload.get("content")
+        
+        found = False
+        for ann in state.get("announcements", []):
+            if ann.get("id") == ann_id:
+                ann["title"] = title
+                ann["content"] = content
+                found = True
+                break
+        
+        if not found:
+            raise HTTPException(status_code=404, detail="Announcement not found.")
+        write_log("ADMIN_AGENT", f"Announcement edited: {ann_id} - '{title}'")
+
+    elif action == "delete_announcement":
+        ann_id = payload.get("id")
+        original_len = len(state.get("announcements", []))
+        state["announcements"] = [ann for ann in state.get("announcements", []) if ann.get("id") != ann_id]
+        
+        if len(state["announcements"]) == original_len:
+            raise HTTPException(status_code=404, detail="Announcement not found.")
+        write_log("ADMIN_AGENT", f"Announcement deleted: {ann_id}")
+
     elif action == "upload_document":
         username = payload.get("username")
         doc_name = payload.get("document_name")
