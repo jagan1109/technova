@@ -334,37 +334,42 @@ def chatbot_endpoint(req: ChatRequest):
             )
             
             streamed_any = False
-            if api_key:
+            try:
+                from google import genai
+                import asyncio
+                
                 try:
-                    import httpx
-                    import asyncio
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?key={api_key}&alt=sse"
-                    headers = {"Content-Type": "application/json"}
-                    data = {
-                        "contents": [{"parts": [{"text": prompt}]}]
-                    }
-                    async with httpx.AsyncClient() as client:
-                        async with client.stream("POST", url, headers=headers, json=data, timeout=60.0) as response:
-                            if response.status_code == 200:
-                                async for line in response.aiter_lines():
-                                    if line.startswith("data: "):
-                                        try:
-                                            chunk_data = json.loads(line[6:])
-                                            text_chunk = chunk_data["candidates"][0]["content"]["parts"][0]["text"]
-                                            if text_chunk:
-                                                streamed_any = True
-                                                for char in text_chunk:
-                                                    yield char
-                                                    await asyncio.sleep(0.001)
-                                        except Exception:
-                                            pass
-                            else:
-                                write_log("CHATBOT_ERROR", f"Gemini API returned status code {response.status_code}")
-                except Exception as e:
-                    write_log("CHATBOT_ERROR", f"Failed to contact Gemini API: {str(e)}")
+                    # 1. Try standard client (uses GEMINI_API_KEY from env if present)
+                    client = genai.Client()
+                    response_stream = client.models.generate_content_stream(
+                        model='gemini-2.5-flash',
+                        contents=prompt
+                    )
+                    for chunk in response_stream:
+                        if chunk.text:
+                            streamed_any = True
+                            for char in chunk.text:
+                                yield char
+                                await asyncio.sleep(0.001)
+                except Exception as sdk_err:
+                    write_log("CHATBOT_ERROR", f"Standard GenAI SDK call failed: {str(sdk_err)}. Attempting Vertex AI fallback...")
+                    # 2. Fall back to Vertex AI client (uses Google Auth default credentials)
+                    client = genai.Client(vertexai=True)
+                    response_stream = client.models.generate_content_stream(
+                        model='gemini-2.5-flash',
+                        contents=prompt
+                    )
+                    for chunk in response_stream:
+                        if chunk.text:
+                            streamed_any = True
+                            for char in chunk.text:
+                                yield char
+                                await asyncio.sleep(0.001)
+            except Exception as e:
+                write_log("CHATBOT_ERROR", f"All Gemini GenAI SDK calls failed: {str(e)}")
             
             if not streamed_any:
-                fallback_msg = f"[RAG Rules Context] Retrieved Rules:\n{rules_context}\n\n(Please check that GEMINI_API_KEY in .env is valid)"
+                fallback_msg = f"[RAG Rules Context] Retrieved Rules:\n{rules_context}\n\n(Please check that Google Cloud credentials or GEMINI_API_KEY are configured)"
                 import asyncio
                 for char in fallback_msg:
                     yield char
