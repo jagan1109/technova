@@ -465,8 +465,12 @@ function updateDashboardView() {
 
             Object.keys(systemState.teachers).forEach(uname => {
                 const t = systemState.teachers[uname];
+                const docStatuses = t.document_statuses || {};
+                const allVerified = docStatuses.aadhaar_card === 'approved' && 
+                                    docStatuses.appointment_letter === 'approved' && 
+                                    docStatuses.teacher_eligibility_test === 'approved';
                 const hasUploadedDocs = t.document_paths && (t.document_paths.aadhaar_card || t.document_paths.appointment_letter || t.document_paths.teacher_eligibility_test);
-                if (hasUploadedDocs) {
+                if (hasUploadedDocs && !allVerified) {
                     hasAnyDocs = true;
                     const sec = document.createElement('div');
                     sec.className = 'verification-teacher-section mt-3';
