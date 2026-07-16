@@ -1613,7 +1613,7 @@ async function sendFullscreenChatMessage() {
                     });
                     
                     // Dynamically adjust delay: speed up to print faster if queue backlog increases
-                    const currentDelay = Math.max(10, 45 - wordQueue.length * 3);
+                    const currentDelay = Math.max(5, 20 - wordQueue.length * 2);
                     setTimeout(nextWord, currentDelay);
                 } else {
                     isRendering = false;
