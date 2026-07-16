@@ -1559,14 +1559,18 @@ async function sendFullscreenChatMessage() {
 
     appendFullscreenChatBubble('user', text);
     fullscreenChatInput.value = '';
-    fullscreenChatBody.scrollTo({
-        top: fullscreenChatBody.scrollHeight,
-        behavior: 'smooth'
-    });
 
     // Show thinking indicator bubble with custom blinking "Thinking..." text
     const thinkingBubble = appendFullscreenChatBubble('bot', '<span class="blinking-thinking">Thinking...</span>', true);
     thinkingBubble.id = 'thinking-bubble';
+
+    // Scroll to the bottom so the thinking bubble is fully in view
+    setTimeout(() => {
+        fullscreenChatBody.scrollTo({
+            top: fullscreenChatBody.scrollHeight,
+            behavior: 'smooth'
+        });
+    }, 50);
 
     try {
         const res = await fetch('/api/chat', {

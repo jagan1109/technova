@@ -649,7 +649,12 @@ def chatbot_endpoint(req: ChatRequest):
                         yield word
                     await asyncio.sleep(0.03)
 
-    return StreamingResponse(event_generator(), media_type="text/plain")
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no"
+    }
+    return StreamingResponse(event_generator(), media_type="text/event-stream", headers=headers)
 
 def send_welcome_email_task(email: str, username: str, name: str, password: str):
     from app.app_utils.email import send_email
