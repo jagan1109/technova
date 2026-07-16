@@ -200,6 +200,11 @@ function switchTab(tabId) {
     if (tabId === 'candidate-settings') {
         showSettingsView('main');
     }
+    if (tabId === 'candidate-chatbot') {
+        setTimeout(() => {
+            fullscreenChatBody.scrollTop = fullscreenChatBody.scrollHeight;
+        }, 50);
+    }
 }
 
 function showSettingsView(viewName) {
@@ -1653,7 +1658,9 @@ function loadChatHistory() {
                 bubble.innerHTML = msg.html;
                 fullscreenChatBody.appendChild(bubble);
             });
-            fullscreenChatBody.scrollTop = fullscreenChatBody.scrollHeight;
+            setTimeout(() => {
+                fullscreenChatBody.scrollTop = fullscreenChatBody.scrollHeight;
+            }, 100);
         } catch (e) {
             console.error('Failed to parse chat history', e);
         }
