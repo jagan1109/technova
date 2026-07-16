@@ -1593,23 +1593,51 @@ async function sendFullscreenChatMessage() {
         let accumulatedResponse = "";
         let isFirstChunk = true;
 
+        // Typewriter rendering queue configuration
+        let wordQueue = [];
+        let renderText = "";
+        let isRendering = false;
+
+        function startTypewriter() {
+            if (isRendering) return;
+            isRendering = true;
+
+            function nextWord() {
+                if (wordQueue.length > 0) {
+                    const next = wordQueue.shift();
+                    renderText += next;
+                    botBubble.innerHTML = formatMarkdown(renderText);
+                    fullscreenChatBody.scrollTo({
+                        top: fullscreenChatBody.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                    setTimeout(nextWord, 45); // 45ms smooth delay per word/chunk
+                } else {
+                    isRendering = false;
+                }
+            }
+            nextWord();
+        }
+
         while (true) {
             const { done, value } = await reader.read();
-            if (done) {
-                botBubble.innerHTML = formatMarkdown(accumulatedResponse);
-                break;
-            }
+            if (done) break;
             const chunk = decoder.decode(value, { stream: true });
             if (isFirstChunk && chunk.length > 0) {
                 botBubble.innerHTML = "";
                 isFirstChunk = false;
             }
             accumulatedResponse += chunk;
-            botBubble.innerHTML = formatMarkdown(accumulatedResponse);
-            fullscreenChatBody.scrollTo({
-                top: fullscreenChatBody.scrollHeight,
-                behavior: 'smooth'
-            });
+
+            // Split chunk into words/spaces and push to typewriter queue
+            const parts = chunk.match(/\s*\S+\s*/g) || [chunk];
+            wordQueue.push(...parts);
+            startTypewriter();
+        }
+
+        // Wait until typewriter queue has fully finished rendering before saving history
+        while (isRendering || wordQueue.length > 0) {
+            await new Promise(r => setTimeout(r, 100));
         }
         saveChatHistory();
     } catch (e) {
