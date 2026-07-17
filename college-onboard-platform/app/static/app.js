@@ -477,7 +477,27 @@ function updateDashboardView() {
                 grid.style.gap = '12px';
                 grid.className = 'mt-3';
 
-                teacher.projects.forEach((proj, idx) => {
+                // Sort projects based on current selection
+                const sortOption = document.getElementById('project-sort-option')?.value || 'date_desc';
+                const sortedProjects = [...teacher.projects];
+
+                sortedProjects.sort((a, b) => {
+                    let valA, valB;
+                    if (sortOption === 'name_asc') {
+                        valA = (a.title || '').toLowerCase();
+                        valB = (b.title || '').toLowerCase();
+                        if (valA < valB) return -1;
+                        if (valA > valB) return 1;
+                    } else { // 'date_desc'
+                        valA = a.uploaded_at ? new Date(a.uploaded_at) : new Date(0);
+                        valB = b.uploaded_at ? new Date(b.uploaded_at) : new Date(0);
+                        if (valA < valB) return 1;
+                        if (valA > valB) return -1;
+                    }
+                    return 0;
+                });
+
+                sortedProjects.forEach((proj, idx) => {
                     const item = document.createElement('div');
                     item.style.background = 'rgba(255, 255, 255, 0.02)';
                     item.style.border = '1px solid rgba(255, 255, 255, 0.08)';
@@ -2164,6 +2184,11 @@ window.enableSeatingEdit = function(username) {
 
 // Project upload form and choose file listeners
 document.addEventListener('DOMContentLoaded', () => {
+    const projectSortOption = document.getElementById('project-sort-option');
+    if (projectSortOption) {
+        projectSortOption.addEventListener('change', updateDashboardView);
+    }
+
     const projectFileTrigger = document.getElementById('project-file-trigger');
     const projectFileInput = document.getElementById('project-file-input');
     const projectFileName = document.getElementById('project-file-name');
