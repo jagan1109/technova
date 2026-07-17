@@ -350,9 +350,19 @@
                         </div>
 
                         <!-- Projects List Section -->
-                        <h3 style="font-size: 1.1rem; margin-top: 30px; margin-bottom: 15px; color: #c9d1d9; display: flex; align-items: center; gap: 8px;">
-                            <span>📂</span> My Uploaded Projects
-                        </h3>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="font-size: 1.1rem; margin: 0; color: #c9d1d9; display: flex; align-items: center; gap: 8px;">
+                                <span>📂</span> My Uploaded Projects
+                            </h3>
+                            <!-- Sort Controls -->
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <label for="project-sort-option" style="font-size: 0.85rem; color: #8b949e;">Sort by:</label>
+                                <select id="project-sort-option" style="background: #0d1117; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; padding: 6px 12px; color: #c9d1d9; font-size: 0.85rem; outline: none; cursor: pointer;">
+                                    <option value="date_desc" selected>Newest to Oldest</option>
+                                    <option value="name_asc">Alphabetical (A-Z)</option>
+                                </select>
+                            </div>
+                        </div>
                         <div id="projects-list-container">
                             <div class="empty-projects-box mt-3">
                                 <p class="text-muted">No projects or publications found in record.</p>
