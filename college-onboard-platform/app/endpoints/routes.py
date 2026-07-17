@@ -358,6 +358,56 @@ def run_scheduler_agent_brief(state: dict, username: str) -> str:
     return "\n".join(brief_parts)
 
 
+@router.post("/api/leaves/apply")
+async def apply_leave_endpoint(
+    username: str = Form(...),
+    leave_date: str = Form(...),
+    leave_type: str = Form(...),
+    title: str = Form(...),
+    description: str = Form(...),
+    file: Optional[UploadFile] = File(None)
+) -> dict:
+    store = LocalStateStore()
+    state = store.load_state()
+    if not state or "teachers" not in state or username not in state["teachers"]:
+        raise HTTPException(status_code=404, detail="Teacher not found.")
+        
+    teacher = state["teachers"][username]
+    if "applied_leaves" not in teacher:
+        teacher["applied_leaves"] = []
+        
+    file_url = ""
+    filename = ""
+    if file and file.filename:
+        static_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
+        user_dir = os.path.join(static_dir, "uploads", username, "leaves")
+        os.makedirs(user_dir, exist_ok=True)
+        file_path = os.path.join(user_dir, file.filename)
+        content = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+        file_url = f"/static/uploads/{username}/leaves/{file.filename}"
+        filename = file.filename
+        
+    import secrets
+    leave_id = secrets.token_hex(4)
+    
+    new_leave = {
+        "id": leave_id,
+        "date": leave_date,
+        "type": leave_type,
+        "title": title,
+        "description": description,
+        "document_url": file_url,
+        "document_name": filename,
+        "status": "pending"
+    }
+    teacher["applied_leaves"].append(new_leave)
+    store.save_state(state)
+    write_log("CANDIDATE_PORTAL", f"Applied for leave: {leave_type} on {leave_date} for teacher {username} (ID: {leave_id})")
+    return {"status": "success", "leave_id": leave_id}
+
+
 @router.get("/api/state")
 def get_state() -> dict:
     store = LocalStateStore()
@@ -400,6 +450,10 @@ def get_state() -> dict:
 
         if "employee_id" not in teacher:
             teacher["employee_id"] = ""
+            modified = True
+
+        if "applied_leaves" not in teacher:
+            teacher["applied_leaves"] = []
             modified = True
 
         if "onboarding_status_message" not in teacher:
@@ -462,6 +516,7 @@ def initialize_default_state() -> dict:
                 ],
                 "documents": ["PhD_Cert.pdf", "Joining_Letter.pdf"],
                 "projects": [],
+                "applied_leaves": [],
                 "schedule": [
                     {"day": "Monday", "time": "09:00 AM - 10:30 AM", "class": "CSE-A", "subject": "Advanced Algorithms"},
                     {"day": "Wednesday", "time": "11:00 AM - 12:30 PM", "class": "CSE-B", "subject": "Machine Learning"},
@@ -1045,6 +1100,87 @@ def trigger_action(req: ActionRequest, background_tasks: BackgroundTasks) -> dic
         teacher = state["teachers"][username]
         teacher["email"] = new_email
         write_log("CANDIDATE_PORTAL", f"Email updated successfully for user: {username} to {new_email}")
+
+    elif action == "apply_leave":
+        username = payload.get("username")
+        leave_date = payload.get("leave_date")
+        leave_type = payload.get("leave_type")
+        
+        if username not in state["teachers"]:
+            raise HTTPException(status_code=404, detail="Teacher not found.")
+            
+        teacher = state["teachers"][username]
+        if "applied_leaves" not in teacher:
+            teacher["applied_leaves"] = []
+            
+        import secrets
+        leave_id = secrets.token_hex(4)
+        
+        new_leave = {
+            "id": leave_id,
+            "date": leave_date,
+            "type": leave_type,
+            "status": "pending"
+        }
+        teacher["applied_leaves"].append(new_leave)
+        write_log("CANDIDATE_PORTAL", f"Applied for leave: {leave_type} on {leave_date} for teacher {username} (ID: {leave_id})")
+
+    elif action == "approve_leave":
+        username = payload.get("username")
+        leave_id = payload.get("leave_id")
+        
+        if username not in state["teachers"]:
+            raise HTTPException(status_code=404, detail="Teacher not found.")
+            
+        teacher = state["teachers"][username]
+        applied = teacher.get("applied_leaves", [])
+        
+        found = False
+        for lvl in applied:
+            if lvl.get("id") == leave_id:
+                lvl["status"] = "approved"
+                found = True
+                
+                # Add to attendance (absent record)
+                if "attendance" not in teacher:
+                    teacher["attendance"] = []
+                new_att = {
+                    "date": lvl.get("date"),
+                    "status": "Absent",
+                    "reason": lvl.get("type")
+                }
+                teacher["attendance"].append(new_att)
+                
+                # Decrement leave balance
+                if lvl.get("type") != "Loss of Pay Leave":
+                    current_balance = teacher.get("leave_balance", 30)
+                    teacher["leave_balance"] = max(0, current_balance - 1)
+                break
+                
+        if not found:
+            raise HTTPException(status_code=404, detail="Leave application not found.")
+        write_log("HR_PORTAL", f"Approved leave {leave_id} for teacher {username}")
+
+    elif action == "reject_leave":
+        username = payload.get("username")
+        leave_id = payload.get("leave_id")
+        
+        if username not in state["teachers"]:
+            raise HTTPException(status_code=404, detail="Teacher not found.")
+            
+        teacher = state["teachers"][username]
+        applied = teacher.get("applied_leaves", [])
+        
+        found = False
+        for lvl in applied:
+            if lvl.get("id") == leave_id:
+                lvl["status"] = "rejected"
+                found = True
+                break
+                
+        if not found:
+            raise HTTPException(status_code=404, detail="Leave application not found.")
+        write_log("HR_PORTAL", f"Rejected leave {leave_id} for teacher {username}")
 
     elif action == "update_teacher":
         username = payload.get("username")

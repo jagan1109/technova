@@ -252,7 +252,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
         if (!btn) return;
         const targetTab = btn.getAttribute('data-tab');
         switchTab(targetTab);
-        
+
         if (targetTab === 'candidate-chatbot') {
             const teacher = (systemState.teachers && systemState.teachers[currentUser]) ? systemState.teachers[currentUser] : null;
             if (teacher && teacher.current_stage === 'policy_review') {
@@ -385,7 +385,7 @@ function updateDashboardView() {
     sortedAnn.forEach(ann => {
         const annDiv = document.createElement('div');
         annDiv.className = 'ann-item';
-        
+
         let actionButtons = '';
         if (currentRole === 'admin') {
             actionButtons = `
@@ -465,18 +465,95 @@ function updateDashboardView() {
         teacherSchedule = teacher.schedule || [];
 
         // Attendance Record
+        const presentCount = document.getElementById('attendance-present-count');
         const absentCount = document.getElementById('attendance-absent-count');
-        absentCount.innerText = teacher.attendance ? teacher.attendance.length : 0;
+        const totalWorkingDays = document.getElementById('attendance-total-working-days');
+        
+        function getWeekdaysInMonthUpToToday() {
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            const todayDay = date.getDate();
+            let weekdays = 0;
+            for (let d = 1; d <= todayDay; d++) {
+                const curDate = new Date(year, month, d);
+                const dayOfWeek = curDate.getDay();
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                    weekdays++;
+                }
+            }
+            return weekdays;
+        }
+
+        const approvedLeavesCount = (teacher.applied_leaves || []).filter(lvl => lvl.status === 'approved').length;
+        const tDays = getWeekdaysInMonthUpToToday();
+        const aDays = approvedLeavesCount;
+        const pDays = Math.max(0, tDays - aDays);
+        
+        if (presentCount) presentCount.innerText = pDays;
+        if (absentCount) absentCount.innerText = aDays;
+        if (totalWorkingDays) totalWorkingDays.innerText = tDays;
 
         const attendanceBody = document.getElementById('attendance-record-body');
         attendanceBody.innerHTML = '';
-        if (teacher.attendance && teacher.attendance.length > 0) {
+        
+        const combinedList = [];
+        if (teacher.attendance) {
             teacher.attendance.forEach(att => {
+                const isApplied = (teacher.applied_leaves || []).some(lvl => lvl.date === att.date);
+                if (!isApplied) {
+                    combinedList.push({
+                        date: att.date,
+                        type: att.reason,
+                        title: att.reason,
+                        description: 'Historical attendance log',
+                        document_url: '',
+                        status: 'approved'
+                    });
+                }
+            });
+        }
+        
+        if (teacher.applied_leaves) {
+            teacher.applied_leaves.forEach(lvl => {
+                combinedList.push({
+                    date: lvl.date,
+                    type: lvl.type,
+                    title: lvl.title || lvl.type,
+                    description: lvl.description || '',
+                    document_url: lvl.document_url || '',
+                    status: lvl.status
+                });
+            });
+        }
+        
+        combinedList.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        if (combinedList.length > 0) {
+            combinedList.forEach(item => {
+                let statusBadge = '';
+                if (item.status === 'pending') {
+                    statusBadge = '<span class="badge" style="background: #e3b341; color: #0d1117; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem;">Pending</span>';
+                } else if (item.status === 'approved' || item.status === 'accepted') {
+                    statusBadge = '<span class="badge" style="background: #2ea043; color: #fff; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem;">Accepted</span>';
+                } else {
+                    statusBadge = '<span class="badge" style="background: #f85149; color: #fff; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8rem;">Rejected</span>';
+                }
+                
+                let docHTML = '';
+                if (item.document_url) {
+                    docHTML = `<br><a href="#" onclick="window.viewDoc('${item.document_url}'); return false;" style="font-size: 0.8rem; color: #58a6ff; text-decoration: underline;">📄 View Support Doc</a>`;
+                }
+                
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${att.date}</td>
-                    <td><span class="badge badge-danger">${att.status}</span></td>
-                    <td>${att.reason}</td>
+                    <td><strong>${item.date}</strong></td>
+                    <td>
+                        <div style="font-weight: 600; color: #c9d1d9;">${item.title}</div>
+                        <div style="font-size: 0.85rem; color: #8b949e;">${item.description || item.type}</div>
+                        ${docHTML}
+                    </td>
+                    <td>${statusBadge}</td>
                 `;
                 attendanceBody.appendChild(tr);
             });
@@ -520,7 +597,7 @@ function updateDashboardView() {
                         try {
                             const parts = pathString.split('/');
                             return decodeURIComponent(parts[parts.length - 1]);
-                        } catch(e) {
+                        } catch (e) {
                             return pathString;
                         }
                     };
@@ -599,7 +676,7 @@ function updateDashboardView() {
                     item.style.display = 'flex';
                     item.style.justifyContent = 'space-between';
                     item.style.alignItems = 'center';
-                    
+
                     item.innerHTML = `
                         <div style="display: flex; flex-direction: column; gap: 4px; text-align: left;">
                             <span style="font-weight: 600; color: #c9d1d9; font-size: 1rem;">${proj.title}</span>
@@ -674,7 +751,7 @@ function updateDashboardView() {
                 pendingTeachersCount++;
             }
 
-            const matchesQuery = !hrQuery || 
+            const matchesQuery = !hrQuery ||
                 (t.name && t.name.toLowerCase().includes(hrQuery)) ||
                 (t.username && t.username.toLowerCase().includes(hrQuery)) ||
                 (t.email && t.email.toLowerCase().includes(hrQuery)) ||
@@ -684,7 +761,7 @@ function updateDashboardView() {
                 const div = document.createElement('div');
                 div.className = 'teacher-card-item';
                 div.setAttribute('data-username', t.username);
-                
+
                 let avatarHTML = '<span style="font-size: 1.5rem; margin-right: 12px; background: rgba(255,255,255,0.05); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">👤</span>';
                 if (t.profile_photo_url) {
                     avatarHTML = `<img src="${t.profile_photo_url}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-right: 12px; border: 1px solid rgba(255,255,255,0.1);">`;
@@ -755,9 +832,9 @@ function updateDashboardView() {
             Object.keys(systemState.teachers).forEach(uname => {
                 const t = systemState.teachers[uname];
                 const docStatuses = t.document_statuses || {};
-                const allVerified = docStatuses.aadhaar_card === 'approved' && 
-                                    docStatuses.appointment_letter === 'approved' && 
-                                    docStatuses.teacher_eligibility_test === 'approved';
+                const allVerified = docStatuses.aadhaar_card === 'approved' &&
+                    docStatuses.appointment_letter === 'approved' &&
+                    docStatuses.teacher_eligibility_test === 'approved';
                 const hasUploadedDocs = t.document_paths && (t.document_paths.aadhaar_card || t.document_paths.appointment_letter || t.document_paths.teacher_eligibility_test);
                 if (hasUploadedDocs && !allVerified) {
                     hasAnyDocs = true;
@@ -773,7 +850,7 @@ function updateDashboardView() {
                         try {
                             const parts = path.split('/');
                             return decodeURIComponent(parts[parts.length - 1]);
-                        } catch(e) {
+                        } catch (e) {
                             return path;
                         }
                     };
@@ -852,6 +929,60 @@ function updateDashboardView() {
 
             if (!hasAnyDocs) {
                 hrVerificationList.innerHTML = '<p class="text-muted text-center mt-3">No pending documents to verify.</p>';
+            }
+        }
+
+        // Populate Leave Applications tab for HR
+        const hrLeavesTab = document.getElementById('hr-leaves-tab');
+        const hrLeaveApplicationsList = document.getElementById('hr-leave-applications-list');
+        
+        let pendingLeavesCount = 0;
+        let pendingLeavesHTML = '';
+
+        Object.keys(systemState.teachers).forEach(uname => {
+            const t = systemState.teachers[uname];
+            const appliedLeaves = t.applied_leaves || [];
+            
+            appliedLeaves.forEach(lvl => {
+                if (lvl.status === 'pending') {
+                    pendingLeavesCount++;
+                    let docHTML = '';
+                    if (lvl.document_url) {
+                        docHTML = `
+                            <div style="margin-top: 6px;">
+                                <button class="btn btn-secondary btn-sm" onclick="viewDoc('${lvl.document_url}')" style="font-size: 0.75rem; padding: 4px 10px;">👁️ View Support Document</button>
+                            </div>
+                        `;
+                    }
+                    pendingLeavesHTML += `
+                        <div class="verification-teacher-section mt-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                            <div style="display: flex; flex-direction: column; gap: 6px; text-align: left; max-width: 70%;">
+                                <strong style="color: #fff; font-size: 1.1rem;">${t.name} (@${t.username})</strong>
+                                <span style="font-size: 0.95rem; color: #fff; font-weight: 500;">Title: ${lvl.title || lvl.type}</span>
+                                <span style="font-size: 0.9rem; color: #c9d1d9;">Type: <strong style="color: #58a6ff;">${lvl.type}</strong></span>
+                                <span style="font-size: 0.85rem; color: #8b949e;">Date: ${lvl.date}</span>
+                                <p style="font-size: 0.85rem; color: #8b949e; margin: 4px 0 0 0; line-height: 1.4;">${lvl.description || ''}</p>
+                                ${docHTML}
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn btn-success btn-sm" onclick="window.decideLeave('${t.username}', '${lvl.id}', 'approve')" style="padding: 8px 16px;">Accept</button>
+                                <button class="btn btn-danger btn-sm" onclick="window.decideLeave('${t.username}', '${lvl.id}', 'reject')" style="padding: 8px 16px;">Reject</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+        });
+
+        if (hrLeavesTab) {
+            hrLeavesTab.innerHTML = `Leave Applications [${pendingLeavesCount}]`;
+        }
+
+        if (hrLeaveApplicationsList) {
+            if (pendingLeavesCount > 0) {
+                hrLeaveApplicationsList.innerHTML = pendingLeavesHTML;
+            } else {
+                hrLeaveApplicationsList.innerHTML = '<p class="text-muted text-center mt-3">No pending leave applications.</p>';
             }
         }
     }
@@ -973,7 +1104,7 @@ function updateDashboardView() {
             });
             sortedOverviewTeachers.forEach(t => {
 
-                const matchesQuery = !adminQuery || 
+                const matchesQuery = !adminQuery ||
                     (t.name && t.name.toLowerCase().includes(adminQuery)) ||
                     (t.email && t.email.toLowerCase().includes(adminQuery)) ||
                     (t.employee_id && t.employee_id.toLowerCase().includes(adminQuery));
@@ -1062,7 +1193,7 @@ hrAddTeacherForm.addEventListener('submit', async (e) => {
     }
 });
 
-window.viewDoc = function(docName) {
+window.viewDoc = function (docName) {
     if (docName && (docName.startsWith('http://') || docName.startsWith('https://') || docName.startsWith('/static/uploads/'))) {
         window.open(docName, "_blank");
         return;
@@ -1091,7 +1222,7 @@ window.viewDoc = function(docName) {
     `);
 };
 
-window.deleteProject = async function(filename) {
+window.deleteProject = async function (filename) {
     if (!confirm("Are you sure you want to permanently delete this project/publication?")) {
         return;
     }
@@ -1173,7 +1304,30 @@ window.completeOnboarding = async function(username) {
     }
 };
 
-window.removeProfilePhoto = async function(username) {
+window.decideLeave = async function(username, leaveId, decision) {
+    const action = decision === 'approve' ? 'approve_leave' : 'reject_leave';
+    const payload = { username, leave_id: leaveId };
+    
+    try {
+        const res = await fetch('/api/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, payload })
+        });
+        
+        if (res.ok) {
+            syncStateData();
+            alert(`Leave application ${decision}d successfully!`);
+        } else {
+            const err = await res.json();
+            alert(`Failed to ${decision} leave: ${err.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        alert(`Server communication error during leave ${decision}al.`);
+    }
+};
+
+window.removeProfilePhoto = async function (username) {
     if (!confirm("Are you sure you want to permanently remove this teacher's profile photo?")) {
         return;
     }
@@ -1215,7 +1369,7 @@ window.removeProfilePhoto = async function(username) {
     }
 };
 
-window.verifyDoc = async function(username, docName, docType, approved) {
+window.verifyDoc = async function (username, docName, docType, approved) {
     const teacher = systemState.teachers[username];
     if (!teacher) return;
 
@@ -1247,7 +1401,7 @@ window.verifyDoc = async function(username, docName, docType, approved) {
         } else {
             syncStateData();
         }
-    } catch(err) {
+    } catch (err) {
         // Rollback
         teacher.document_statuses = originalStatus;
         teacher.current_stage = originalStage;
@@ -1257,7 +1411,7 @@ window.verifyDoc = async function(username, docName, docType, approved) {
     }
 };
 
-window.editAnnouncement = function(id, currentTitle, currentContent) {
+window.editAnnouncement = function (id, currentTitle, currentContent) {
     document.getElementById('edit-ann-id').value = id;
     document.getElementById('edit-ann-title').value = currentTitle;
     document.getElementById('edit-ann-content').value = currentContent;
@@ -1291,7 +1445,7 @@ document.getElementById('admin-edit-announcement-form').addEventListener('submit
     // Optimistic Update
     updateDashboardView();
     document.getElementById('admin-edit-announcement-modal').classList.add('hidden');
-    
+
     try {
         const res = await fetch('/api/action', {
             method: 'POST',
@@ -1309,7 +1463,7 @@ document.getElementById('admin-edit-announcement-form').addEventListener('submit
         } else {
             syncStateData();
         }
-    } catch(err) {
+    } catch (err) {
         // Rollback
         systemState.announcements = originalAnnouncements;
         updateDashboardView();
@@ -1317,9 +1471,9 @@ document.getElementById('admin-edit-announcement-form').addEventListener('submit
     }
 });
 
-window.deleteAnnouncement = async function(id) {
+window.deleteAnnouncement = async function (id) {
     if (!confirm("Are you sure you want to delete this announcement?")) return;
-    
+
     const originalAnnouncements = [...systemState.announcements];
     systemState.announcements = systemState.announcements.filter(ann => ann.id !== id);
 
@@ -1343,7 +1497,7 @@ window.deleteAnnouncement = async function(id) {
         } else {
             syncStateData();
         }
-    } catch(err) {
+    } catch (err) {
         // Rollback
         systemState.announcements = originalAnnouncements;
         updateDashboardView();
@@ -1503,14 +1657,14 @@ function updateSubmitButtonState() {
     const teacher = (systemState.teachers && systemState.teachers[currentUser]) ? systemState.teachers[currentUser] : {};
     const statuses = teacher.document_statuses || {};
 
-    const aadhaarReady = (statuses['aadhaar_card'] === 'pending' || statuses['aadhaar_card'] === 'approved') || 
-                         (fileAadhaar && fileAadhaar.files && fileAadhaar.files.length > 0);
-                         
-    const appointmentReady = (statuses['appointment_letter'] === 'pending' || statuses['appointment_letter'] === 'approved') || 
-                             (fileAppointment && fileAppointment.files && fileAppointment.files.length > 0);
-                             
-    const tetReady = (statuses['teacher_eligibility_test'] === 'pending' || statuses['teacher_eligibility_test'] === 'approved') || 
-                     (fileTet && fileTet.files && fileTet.files.length > 0);
+    const aadhaarReady = (statuses['aadhaar_card'] === 'pending' || statuses['aadhaar_card'] === 'approved') ||
+        (fileAadhaar && fileAadhaar.files && fileAadhaar.files.length > 0);
+
+    const appointmentReady = (statuses['appointment_letter'] === 'pending' || statuses['appointment_letter'] === 'approved') ||
+        (fileAppointment && fileAppointment.files && fileAppointment.files.length > 0);
+
+    const tetReady = (statuses['teacher_eligibility_test'] === 'pending' || statuses['teacher_eligibility_test'] === 'approved') ||
+        (fileTet && fileTet.files && fileTet.files.length > 0);
 
     const hasNewAadhaar = fileAadhaar && fileAadhaar.files && fileAadhaar.files.length > 0;
     const hasNewAppointment = fileAppointment && fileAppointment.files && fileAppointment.files.length > 0;
@@ -1524,11 +1678,11 @@ function updateSubmitButtonState() {
         batchSubmitBtn.innerText = 'Submit';
     } else {
         batchSubmitBtn.disabled = true;
-        
+
         // If all three documents are already successfully uploaded and pending/approved
         const allSubmitted = (statuses['aadhaar_card'] === 'pending' || statuses['aadhaar_card'] === 'approved') &&
-                             (statuses['appointment_letter'] === 'pending' || statuses['appointment_letter'] === 'approved') &&
-                             (statuses['teacher_eligibility_test'] === 'pending' || statuses['teacher_eligibility_test'] === 'approved');
+            (statuses['appointment_letter'] === 'pending' || statuses['appointment_letter'] === 'approved') &&
+            (statuses['teacher_eligibility_test'] === 'pending' || statuses['teacher_eligibility_test'] === 'approved');
         if (allSubmitted) {
             batchSubmitBtn.innerText = 'Submitted';
         } else {
@@ -1653,7 +1807,7 @@ if (batchSubmitBtn) {
             t.document_paths[item.type] = item.file.name;
         });
         t.onboarding_status_message = 'Pending verification by HR';
-        
+
         // Re-render UI immediately
         updateDashboardView();
 
@@ -1704,7 +1858,7 @@ if (batchSubmitBtn) {
 }
 
 // Dynamic Seating Allotment Trigger
-window.allocateSeating = async function(username) {
+window.allocateSeating = async function (username) {
     const input = document.getElementById(`seating-input-${username}`);
     if (!input || !input.value.trim()) {
         alert('Please enter seating coordinates.');
@@ -1747,7 +1901,7 @@ window.allocateSeating = async function(username) {
     }
 };
 
-window.enableSeatingEdit = function(username) {
+window.enableSeatingEdit = function (username) {
     editingSeating[username] = true;
     updateDashboardView();
 };
@@ -1850,7 +2004,7 @@ if (updateEmailForm) {
         e.preventDefault();
         const prefix = document.getElementById('settings-email-prefix').value.trim();
         if (!prefix) return;
-        
+
         const cleanedPrefix = prefix.replace(/@pes\.edu$/i, '').trim();
         const newEmail = `${cleanedPrefix}@pes.edu`;
 
@@ -1949,7 +2103,7 @@ async function sendFullscreenChatMessage() {
                         top: fullscreenChatBody.scrollHeight,
                         behavior: 'smooth'
                     });
-                    
+
                     // Dynamically adjust delay: speed up to print faster if queue backlog increases
                     const currentDelay = Math.max(5, 20 - wordQueue.length * 2);
                     setTimeout(nextWord, currentDelay);
@@ -1996,19 +2150,19 @@ function formatMarkdown(text) {
     if (!text) return '';
     // Clean up citations: e.g. [cite: 1], [cite:1], [cite], etc.
     let cleaned = text.replace(/\[cite:?\s*\d*\]/gi, '');
-    
+
     // Split by newlines to parse line-by-line (e.g. lists)
     let lines = cleaned.split('\n');
     let inList = false;
     let htmlOutput = [];
-    
+
     for (let i = 0; i < lines.length; i++) {
         let line = lines[i];
         let trimmed = line.trim();
-        
+
         // Check if the line is a bullet point (starts with *, -, or •)
         let isBullet = /^[*•-]\s+/.test(trimmed);
-        
+
         if (isBullet) {
             if (!inList) {
                 htmlOutput.push('<ul style="margin: 0.35rem 0; padding-left: 1.25rem; list-style-type: disc;">');
@@ -2016,7 +2170,7 @@ function formatMarkdown(text) {
             }
             // Remove the bullet character from the beginning
             let content = trimmed.replace(/^[*•-]\s+/, '');
-            
+
             // Format inline elements inside the bullet content
             content = formatInlineMarkdown(content);
             htmlOutput.push('<li style="margin-bottom: 0.25rem; line-height: 1.4; color: #e6edf3;">' + content + '</li>');
@@ -2025,17 +2179,17 @@ function formatMarkdown(text) {
                 htmlOutput.push('</ul>');
                 inList = false;
             }
-            
+
             // Format inline elements
             let content = formatInlineMarkdown(line);
             htmlOutput.push(content);
         }
     }
-    
+
     if (inList) {
         htmlOutput.push('</ul>');
     }
-    
+
     // Join with <br> for non-list items
     let finalHtml = '';
     for (let i = 0; i < htmlOutput.length; i++) {
@@ -2046,7 +2200,7 @@ function formatMarkdown(text) {
             finalHtml += block + (i < htmlOutput.length - 1 ? '<br>' : '');
         }
     }
-    
+
     return finalHtml;
 }
 
@@ -2062,10 +2216,10 @@ function formatInlineMarkdown(text) {
 
     // Convert double asterisks bold: **text** -> <strong>text</strong>
     escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    
+
     // Convert single asterisks bold/italic: *text* -> <em>$1</em>
     escaped = escaped.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    
+
     return escaped;
 }
 
@@ -2161,13 +2315,13 @@ let activeSeatingRoom = '101';
 
 const SEATING_ROOMS = ['101', '102', '201', '202', '301', '302', '401', '402'];
 
-window.openSeatingModal = function(username) {
+window.openSeatingModal = function (username) {
     activeSeatingUsername = username;
     const t = systemState.teachers[username];
     if (!t) return;
-    
+
     document.getElementById('seating-modal-teacher-subtitle').innerText = `Select a room and desk for ${t.name} (@${username})`;
-    
+
     // Parse current seating if any to set activeSeatingRoom
     if (t.seating_info && t.seating_info.startsWith('Room ')) {
         const parts = t.seating_info.split(',');
@@ -2180,10 +2334,10 @@ window.openSeatingModal = function(username) {
     } else {
         activeSeatingRoom = SEATING_ROOMS[0];
     }
-    
+
     renderSeatingModalRooms();
     renderSeatingModalSeats();
-    
+
     document.getElementById('admin-seating-modal').classList.remove('hidden');
 };
 
@@ -2191,7 +2345,7 @@ function renderSeatingModalRooms() {
     const container = document.getElementById('seating-modal-rooms');
     if (!container) return;
     container.innerHTML = '';
-    
+
     SEATING_ROOMS.forEach(room => {
         const btn = document.createElement('button');
         btn.innerText = `Room ${room}`;
@@ -2204,13 +2358,13 @@ function renderSeatingModalRooms() {
         btn.style.textAlign = 'left';
         btn.style.fontWeight = '600';
         btn.style.transition = 'all 0.2s ease';
-        
+
         btn.addEventListener('click', () => {
             activeSeatingRoom = room;
             renderSeatingModalRooms();
             renderSeatingModalSeats();
         });
-        
+
         container.appendChild(btn);
     });
 }
@@ -2219,10 +2373,10 @@ function renderSeatingModalSeats() {
     const grid = document.getElementById('seating-modal-seats-grid');
     const title = document.getElementById('seating-modal-selected-room-title');
     if (!grid || !title) return;
-    
+
     title.innerText = `Room ${activeSeatingRoom} Seating Plan`;
     grid.innerHTML = '';
-    
+
     // Find occupied seats in activeSeatingRoom across all teachers
     const occupiedSeats = {};
     Object.values(systemState.teachers).forEach(t => {
@@ -2234,12 +2388,12 @@ function renderSeatingModalSeats() {
             }
         }
     });
-    
+
     // Generate 16 seats
     for (let seatNum = 1; seatNum <= 16; seatNum++) {
         const seatKey = String(seatNum);
         const occupiedBy = occupiedSeats[seatKey];
-        
+
         const cell = document.createElement('div');
         cell.innerText = seatKey;
         cell.style.display = 'flex';
@@ -2250,7 +2404,7 @@ function renderSeatingModalSeats() {
         cell.style.fontWeight = '600';
         cell.style.fontSize = '1.1rem';
         cell.style.transition = 'all 0.2s ease';
-        
+
         if (occupiedBy) {
             // Occupied seat styling (grey background, grey text, not clickable)
             cell.style.background = 'rgba(255, 255, 255, 0.05)';
@@ -2265,7 +2419,7 @@ function renderSeatingModalSeats() {
             cell.style.color = '#2ea043';
             cell.style.cursor = 'pointer';
             cell.title = `Seat ${seatKey} (Available)`;
-            
+
             cell.addEventListener('mouseover', () => {
                 cell.style.background = 'rgba(46, 160, 67, 0.15)';
                 cell.style.color = '#fff';
@@ -2274,7 +2428,7 @@ function renderSeatingModalSeats() {
                 cell.style.background = 'rgba(46, 160, 67, 0.03)';
                 cell.style.color = '#2ea043';
             });
-            
+
             cell.addEventListener('click', async () => {
                 await selectSeat(activeSeatingRoom, seatKey);
             });
@@ -2286,20 +2440,20 @@ function renderSeatingModalSeats() {
 async function selectSeat(room, seatKey) {
     if (!activeSeatingUsername) return;
     const seatDesc = `Room ${room}, Seat ${seatKey}`;
-    
+
     // Save original state for rollback
     const originalSeating = systemState.teachers[activeSeatingUsername].seating_info;
-    
+
     // Optimistic Update
     systemState.teachers[activeSeatingUsername].seating_info = seatDesc;
     updateDashboardView();
     document.getElementById('admin-seating-modal').classList.add('hidden');
-    
+
     const payload = {
         username: activeSeatingUsername,
         seating_info: seatDesc
     };
-    
+
     try {
         const res = await fetch('/api/action', {
             method: 'POST',
@@ -2332,7 +2486,7 @@ document.getElementById('admin-seating-modal').addEventListener('click', (e) => 
     }
 });
 
-window.enableSeatingEdit = function(username) {
+window.enableSeatingEdit = function (username) {
     openSeatingModal(username);
 };
 
@@ -2405,6 +2559,79 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Leave Application Form Listener
+    const leaveFileTrigger = document.getElementById('leave-file-trigger');
+    const leaveFileInput = document.getElementById('leave-file-input');
+    const leaveFileName = document.getElementById('leave-file-name');
+
+    if (leaveFileTrigger && leaveFileInput) {
+        leaveFileTrigger.addEventListener('click', () => leaveFileInput.click());
+        leaveFileInput.addEventListener('change', () => {
+            if (leaveFileInput.files.length > 0) {
+                leaveFileName.innerText = leaveFileInput.files[0].name;
+            } else {
+                leaveFileName.innerText = 'No file selected';
+            }
+        });
+    }
+
+    const leaveApplicationForm = document.getElementById('leave-application-form');
+    if (leaveApplicationForm) {
+        leaveApplicationForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const dateInput = document.getElementById('leave-date-input');
+            const typeSelect = document.getElementById('leave-type-select');
+            const titleInput = document.getElementById('leave-title-input');
+            const descInput = document.getElementById('leave-desc-input');
+            
+            if (!dateInput || !typeSelect || !dateInput.value || !typeSelect.value || !titleInput || !titleInput.value || !descInput || !descInput.value) {
+                alert('Please fill out all required fields.');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('username', currentUser);
+            formData.append('leave_date', dateInput.value);
+            formData.append('leave_type', typeSelect.value);
+            formData.append('title', titleInput.value.trim());
+            formData.append('description', descInput.value.trim());
+            if (leaveFileInput && leaveFileInput.files && leaveFileInput.files.length > 0) {
+                formData.append('file', leaveFileInput.files[0]);
+            }
+            
+            try {
+                const submitBtn = leaveApplicationForm.querySelector('button[type="submit"]');
+                const originalBtnText = submitBtn.innerText;
+                submitBtn.disabled = true;
+                submitBtn.innerText = 'Submitting...';
+                
+                const res = await fetch('/api/leaves/apply', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                submitBtn.disabled = false;
+                submitBtn.innerText = originalBtnText;
+                
+                if (res.ok) {
+                    dateInput.value = '';
+                    typeSelect.value = '';
+                    titleInput.value = '';
+                    descInput.value = '';
+                    if (leaveFileInput) leaveFileInput.value = '';
+                    if (leaveFileName) leaveFileName.innerText = 'No file selected';
+                    syncStateData();
+                    alert('Leave application submitted successfully!');
+                } else {
+                    const err = await res.json();
+                    alert(`Submission failed: ${err.detail || 'Unknown error'}`);
+                }
+            } catch (error) {
+                alert('Server communication error during leave application submission.');
+            }
+        });
+    }
+
     // Profile photo upload form and choose file listeners
     const photoFileTrigger = document.getElementById('photo-file-trigger');
     const photoFileInput = document.getElementById('photo-file-input');
@@ -2420,7 +2647,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const file = photoFileInput.files[0];
                 photoFileTrigger.innerText = `📁 ${file.name}`;
                 photoUploadSubmit.disabled = false;
-                
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     if (settingsPhotoPreview) {
@@ -2465,7 +2692,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     photoFileTrigger.innerText = '📁 Choose Photo';
                     photoUploadSubmit.disabled = true;
                     if (settingsPhotoStatus) settingsPhotoStatus.innerText = "Custom profile photo active";
-                    
+
                     syncStateData();
                     alert('Profile photo uploaded successfully!');
                 } else {
@@ -2626,7 +2853,7 @@ async function initCalendar() {
 
 async function fetchPublicHolidays(year) {
     if (publicHolidays[year]) return publicHolidays[year];
-    
+
     const fallbackHolidays = [
         { date: `${year}-01-26`, name: "Republic Day", localName: "Republic Day" },
         { date: `${year}-03-02`, name: "Holi", localName: "Holi" },
@@ -2653,7 +2880,7 @@ async function fetchPublicHolidays(year) {
     } catch (e) {
         console.error(`Error fetching holidays for ${year}:`, e);
     }
-    
+
     publicHolidays[year] = fallbackHolidays;
     return fallbackHolidays;
 }
@@ -2706,7 +2933,7 @@ async function renderCalendar() {
 
     // Days in current month
     const totalDays = new Date(calendarYear, calendarMonth + 1, 0).getDate();
-    
+
     // Day index of first day (0 = Sunday, 1 = Monday...) -> map to 0=Mon, 6=Sun
     let firstDayIndex = new Date(calendarYear, calendarMonth, 1).getDay();
     firstDayIndex = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
@@ -2731,7 +2958,7 @@ async function renderCalendar() {
         const dateObj = new Date(calendarYear, calendarMonth, day);
         const isSunday = dateObj.getDay() === 0;
         const weekdayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
-        
+
         if (isSunday) {
             cell.className += ' sunday bg-neutral-800/30 text-neutral-500 pointer-events-none';
         } else {
@@ -3101,7 +3328,7 @@ async function renderAdminCalendar() {
 
     // Days in current month
     const totalDays = new Date(adminCalendarYear, adminCalendarMonth + 1, 0).getDate();
-    
+
     // Day index of first day (0 = Sunday, 1 = Monday...) -> map to 0=Mon, 6=Sun
     let firstDayIndex = new Date(adminCalendarYear, adminCalendarMonth, 1).getDay();
     firstDayIndex = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
@@ -3125,7 +3352,7 @@ async function renderAdminCalendar() {
         // Check if Sunday
         const dateObj = new Date(adminCalendarYear, adminCalendarMonth, day);
         const isSunday = dateObj.getDay() === 0;
-        
+
         if (isSunday) {
             cell.className += ' sunday bg-neutral-800/30 text-neutral-500 pointer-events-none';
         }
@@ -3150,7 +3377,7 @@ async function renderAdminCalendar() {
             cell.addEventListener('click', (e) => {
                 // If clicking an event badge, don't trigger cell click
                 if (e.target.closest('.admin-event-badge')) return;
-                
+
                 if (adminCalendarFilter === 'meetings') {
                     openCalendarEventModal(null, dateStr);
                 } else {
@@ -3191,7 +3418,7 @@ async function renderAdminCalendar() {
                 badge.className = 'calendar-event-badge admin-event-badge bg-blue-800/30 text-blue-400 px-1.5 py-0.5 rounded text-[10px] block w-full truncate whitespace-nowrap overflow-hidden border border-blue-500/20';
                 badge.innerText = `${e.type === 'meeting' ? '💼' : '🎓'} ${e.title}`;
                 badge.title = e.title;
-                
+
                 // Edit event on click
                 badge.addEventListener('click', (ev) => {
                     ev.stopPropagation();
@@ -3208,7 +3435,7 @@ async function renderAdminCalendar() {
                     badge.className = 'calendar-event-badge admin-event-badge bg-purple-800/30 text-purple-400 px-1.5 py-0.5 rounded text-[10px] block w-full truncate whitespace-nowrap overflow-hidden border border-purple-500/20';
                     badge.innerText = `📖 ${c.subject} (${c.class})`;
                     badge.title = `${c.subject} (${c.class}) - ${c.time}`;
-                    
+
                     // Clicking class timetable item will also open timetable management modal
                     badge.addEventListener('click', (ev) => {
                         ev.stopPropagation();
@@ -3255,7 +3482,7 @@ function openCalendarEventModal(eventObj = null, defaultDateStr = null) {
     const modal = document.getElementById('admin-calendar-event-modal');
     const modalTitle = document.getElementById('event-modal-title');
     const deleteBtn = document.getElementById('event-delete-btn');
-    
+
     const eventIdInput = document.getElementById('event-id');
     const titleInput = document.getElementById('event-title');
     const dateInput = document.getElementById('event-date');
@@ -3271,7 +3498,7 @@ function openCalendarEventModal(eventObj = null, defaultDateStr = null) {
     if (eventObj) {
         modalTitle.innerText = "Edit Academic Event";
         deleteBtn.classList.remove('hidden');
-        
+
         eventIdInput.value = eventObj.id || '';
         titleInput.value = eventObj.title || '';
         dateInput.value = eventObj.date || '';
@@ -3294,7 +3521,7 @@ function openCalendarEventModal(eventObj = null, defaultDateStr = null) {
     } else {
         modalTitle.innerText = "Add Academic Event";
         deleteBtn.classList.add('hidden');
-        
+
         eventIdInput.value = '';
         titleInput.value = '';
         dateInput.value = defaultDateStr || '';
@@ -3307,7 +3534,7 @@ function openCalendarEventModal(eventObj = null, defaultDateStr = null) {
             cb.checked = true;
         });
     }
-    
+
     updateEventDeptLabel();
     modal.classList.remove('hidden');
 }
@@ -3329,7 +3556,7 @@ function setupCalendarEventModalListeners() {
             e.stopPropagation();
             deptOptions.classList.toggle('hidden');
         });
-        
+
         document.addEventListener('click', (e) => {
             if (!e.target.closest('#event-dept-dropdown')) {
                 deptOptions.classList.add('hidden');
@@ -3369,7 +3596,7 @@ function setupCalendarEventModalListeners() {
         closeBtn.addEventListener('click', () => {
             modal.classList.add('hidden');
         });
-        
+
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.classList.add('hidden');
@@ -3409,7 +3636,7 @@ function setupCalendarEventModalListeners() {
             e.preventDefault();
 
             const eventId = document.getElementById('event-id').value;
-            
+
             const checkedDepts = [];
             if (document.getElementById('dept-all').checked) {
                 checkedDepts.push('All');
@@ -3594,6 +3821,16 @@ function onAdminCalendarTeacherSelected(username) {
         teacherSchedule = [];
     }
     renderAdminCalendar();
+}
+
+function onTimetableTeacherSelected(username) {
+    if (!systemState || !systemState.teachers || !systemState.teachers[username]) return;
+
+    const teacher = systemState.teachers[username];
+    teacherSchedule = teacher.schedule || [];
+
+    // Update the Current Timetable list below
+    renderAdminTimetableSessionsList();
 }
 
 function formatTimeInputToAmPm(timeStr) {
