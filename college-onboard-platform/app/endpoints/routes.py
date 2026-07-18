@@ -23,9 +23,14 @@ def clean_and_capitalize_name(name: str) -> str:
     capitalized_words = [w.capitalize() for w in words if w]
     return " ".join(capitalized_words)
 
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
 class ChatRequest(BaseModel):
     message: str
     username: Optional[str] = None
+    history: Optional[List[ChatMessage]] = None
 
 class ActionRequest(BaseModel):
     action: str  # e.g., "approve_interview", "upload_documents", "schedule", "allotment", "provision"
@@ -840,6 +845,14 @@ async def chatbot_endpoint(req: ChatRequest):
                 except Exception as e:
                     print(f"[Chatbot State Warning] {e}")
             
+            # Format chat history
+            history_str = ""
+            if req.history:
+                history_str = "\nPrevious Conversation History (Last 3 exchanges):\n"
+                for msg in req.history:
+                    role_label = "User" if msg.role == "user" else "PESU AI"
+                    history_str += f"{role_label}: {msg.content}\n"
+            
             # 3. Call Gemini model using API Key
             from dotenv import load_dotenv
             load_dotenv(override=True)
@@ -857,6 +870,7 @@ async def chatbot_endpoint(req: ChatRequest):
                 f"When formatting larger or multi-part responses, make sure they are well-aligned and readable using proper spacing, newlines, bold text, or clean bullet points where appropriate.\n"
                 f"Make sure to use relevant emojis where appropriate to make it engaging and friendly.\n\n"
                 f"Context:\n{rules_context}\n{user_leave_context}\n\n"
+                f"{history_str}\n"
                 f"User Query: {clean_input}\n\n"
                 f"Response:"
             )

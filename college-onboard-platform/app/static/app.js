@@ -419,7 +419,10 @@ function updateDashboardView() {
         document.getElementById('prof-email').innerText = teacher.email;
         document.getElementById('prof-dept').innerText = teacher.department;
         document.getElementById('prof-desig').innerText = teacher.designation;
-        document.getElementById('prof-leaves').innerText = teacher.leave_balance;
+        const profLeaves = document.getElementById('prof-leaves');
+        if (profLeaves) {
+            profLeaves.innerText = teacher.leave_balance;
+        }
         const profEmpid = document.getElementById('prof-empid');
         if (profEmpid) {
             profEmpid.innerText = teacher.employee_id || 'Not Assigned';
@@ -2235,11 +2238,22 @@ async function sendFullscreenChatMessage() {
         });
     }, 50);
 
+    // Extract history of previous 3 exchanges (up to last 6 messages) from the DOM
+    const bubbles = Array.from(fullscreenChatBody.querySelectorAll('.chat-message'));
+    const historyList = [];
+    for (let i = 0; i < bubbles.length - 1; i++) {
+        const b = bubbles[i];
+        if (b.id === 'thinking-bubble') continue;
+        const role = b.classList.contains('user') ? 'user' : 'assistant';
+        historyList.push({ role: role, content: b.innerText });
+    }
+    const lastSixHistory = historyList.slice(-6);
+
     try {
         const res = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text, username: currentUser })
+            body: JSON.stringify({ message: text, username: currentUser, history: lastSixHistory })
         });
 
         // Remove thinking bubble
