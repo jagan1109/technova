@@ -598,16 +598,23 @@ async def apply_leave_endpoint(
 
 
 @router.get("/api/state")
-def get_state() -> dict:
+async def get_state() -> dict:
     store = LocalStateStore()
     state = store.load_state()
     if not state or "teachers" not in state:
         state = initialize_default_state()
+        state["global_working_days"] = await get_working_days_for_current_month()
         store.save_state(state)
         return state
 
     modified = False
-    initial_cache_len = len(state.get("holiday_briefs_cache", {}))
+    computed_wd = await get_working_days_for_current_month()
+    if state.get("global_working_days") != computed_wd:
+        state["global_working_days"] = computed_wd
+        modified = True
+
+    initial_holiday_cache_len = len(state.get("holiday_briefs_cache", {}))
+    initial_event_cache_len = len(state.get("event_briefs_cache", {}))
     
     # Run the scheduler agent brief generation for daily-phase teachers
     for username, teacher in state.get("teachers", {}).items():
@@ -618,7 +625,9 @@ def get_state() -> dict:
                 teacher["pesu_companion_brief"] = new_brief
                 modified = True
                 
-    if len(state.get("holiday_briefs_cache", {})) != initial_cache_len:
+    if len(state.get("holiday_briefs_cache", {})) != initial_holiday_cache_len:
+        modified = True
+    if len(state.get("event_briefs_cache", {})) != initial_event_cache_len:
         modified = True
     for username, teacher in state.get("teachers", {}).items():
         if "document_statuses" not in teacher or not teacher["document_statuses"]:
@@ -1319,11 +1328,6 @@ def trigger_action(req: ActionRequest, background_tasks: BackgroundTasks) -> dic
         teacher["email"] = new_email
         write_log("CANDIDATE_PORTAL", f"Email updated successfully for user: {username} to {new_email}")
 
-    elif action == "update_working_days":
-        total_working_days = payload.get("total_working_days")
-        state["global_working_days"] = int(total_working_days)
-        write_log("HR_PORTAL", f"Updated global working days to {total_working_days}")
-
     elif action == "log_attendance":
         username = payload.get("username")
         date = payload.get("date")
@@ -1759,9 +1763,76 @@ async def get_calendar_holidays() -> List[dict]:
     return fallback_holidays
 
 
+working_days_cache = {}
+
+
+async def get_working_days_for_current_month() -> int:
+    import calendar
+    import datetime
+    now = datetime.datetime.now()
+    year = now.year
+    if year < 2026:
+        year = 2026
+    month = now.month
+
+    cache_key = (year, month)
+    if cache_key in working_days_cache:
+        return working_days_cache[cache_key]
+
+    # Get the number of days in the current calendar month
+    _, num_days = calendar.monthrange(year, month)
+
+    base_working_days = 0
+    # Count Mondays to Saturdays in the month
+    for day in range(1, num_days + 1):
+        d = datetime.date(year, month, day)
+        # weekday() returns 0 for Monday, ..., 6 for Sunday
+        if d.weekday() != 6:  # Exclude Sunday (6)
+            base_working_days += 1
+
+    # Fetch holidays for the current year
+    try:
+        holidays = await get_calendar_holidays()
+    except Exception as e:
+        print(f"[WORKING DAYS ERROR] Failed to fetch holidays: {e}")
+        holidays = []
+
+    # Subtract holidays that fall on a working day (Mon-Sat) in the current month
+    month_prefix = f"{year}-{month:02d}-"
+    holiday_deductions = 0
+    for h in holidays:
+        h_date_str = h.get("date")
+        if h_date_str and h_date_str.startswith(month_prefix):
+            try:
+                h_date = datetime.datetime.strptime(h_date_str, "%Y-%m-%d").date()
+                if h_date.weekday() != 6:  # Lands on Monday-Saturday
+                    holiday_deductions += 1
+            except Exception as ex:
+                print(f"[WORKING DAYS ERROR] Failed to parse holiday date {h_date_str}: {ex}")
+
+    total_working_days = base_working_days - holiday_deductions
+    working_days_cache[cache_key] = total_working_days
+    return total_working_days
+
+
+@router.get("/api/attendance/working-days")
+async def get_attendance_working_days() -> dict:
+    val = await get_working_days_for_current_month()
+    return {"total_working_days": val}
+
+
 # ------------------ MEETINGS ENDPOINTS ------------------
+import time
+meetings_cache = None
+meetings_cache_expiry = 0.0
+
 @router.get("/api/calendar/meetings")
 def get_calendar_meetings() -> List[dict]:
+    global meetings_cache, meetings_cache_expiry
+    now = time.time()
+    if meetings_cache is not None and now < meetings_cache_expiry:
+        return meetings_cache
+
     print("[GET /api/calendar/meetings] Fetching meetings...")
     store = LocalStateStore()
     state = store.load_state()
@@ -1779,6 +1850,8 @@ def get_calendar_meetings() -> List[dict]:
                     m["date"] = m.get("event_date")
                     m["time"] = m.get("event_time")
                     m["type"] = "meeting"
+                meetings_cache = res.data
+                meetings_cache_expiry = now + 30.0
                 return res.data
         except Exception as e:
             print(f"[Supabase Warning] Failed to fetch meetings table: {e}")
@@ -1817,10 +1890,15 @@ def get_calendar_meetings() -> List[dict]:
         m["time"] = m.get("event_time") or m.get("time")
         m["type"] = "meeting"
         
+    meetings_cache = state["meetings"]
+    meetings_cache_expiry = now + 30.0
     return state["meetings"]
 
 @router.post("/api/calendar/meetings")
 def add_calendar_meeting(meeting: MeetingSchema) -> dict:
+    global meetings_cache, meetings_cache_expiry
+    meetings_cache = None
+    meetings_cache_expiry = 0.0
     print(f"[POST /api/calendar/meetings] Adding meeting: {meeting.title}...")
     store = LocalStateStore()
     state = store.load_state()
@@ -1874,6 +1952,9 @@ def add_calendar_meeting(meeting: MeetingSchema) -> dict:
 
 @router.put("/api/calendar/meetings/{id}")
 def update_calendar_meeting(id: str, meeting: MeetingSchema) -> dict:
+    global meetings_cache, meetings_cache_expiry
+    meetings_cache = None
+    meetings_cache_expiry = 0.0
     print(f"[PUT /api/calendar/meetings/{id}] Updating meeting: {meeting.title}...")
     store = LocalStateStore()
     state = store.load_state()
@@ -1926,6 +2007,9 @@ def update_calendar_meeting(id: str, meeting: MeetingSchema) -> dict:
 
 @router.delete("/api/calendar/meetings/{id}")
 def delete_calendar_meeting(id: str) -> dict:
+    global meetings_cache, meetings_cache_expiry
+    meetings_cache = None
+    meetings_cache_expiry = 0.0
     print(f"[DELETE /api/calendar/meetings/{id}] Deleting meeting...")
     store = LocalStateStore()
     state = store.load_state()
