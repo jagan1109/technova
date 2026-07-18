@@ -333,6 +333,7 @@ function showSettingsView(viewName) {
     }
 }
 
+
 // Update DOM elements using loaded state
 function updateDashboardView() {
     if (!systemState) return;
@@ -514,7 +515,7 @@ function updateDashboardView() {
             });
         }
 
-        const tDays = systemState.global_working_days !== undefined ? systemState.global_working_days : getWeekdaysInMonthUpToToday();
+        const tDays = systemState.global_working_days !== undefined ? systemState.global_working_days : 26;
         const aDays = absentDates.size;
         const pDays = presentDates.size;
         
@@ -1205,48 +1206,7 @@ function updateDashboardView() {
     }
 }
 
-// HR Working Days Form
-const hrWorkingDaysForm = document.getElementById('hr-working-days-form');
-if (hrWorkingDaysForm) {
-    hrWorkingDaysForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const countInput = document.getElementById('hr-wd-count-input');
-        
-        if (!countInput || !countInput.value) {
-            alert('Please specify the working days.');
-            return;
-        }
-        
-        const totalWorkingDaysValue = parseInt(countInput.value, 10);
-        
-        systemState.global_working_days = totalWorkingDaysValue;
-        updateDashboardView();
-        
-        try {
-            const res = await fetch('/api/action', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'update_working_days',
-                    payload: {
-                        total_working_days: totalWorkingDaysValue
-                    }
-                })
-            });
-            
-            if (res.ok) {
-                syncStateData();
-                alert(`Successfully updated global working days to ${totalWorkingDaysValue}!`);
-                countInput.value = '';
-            } else {
-                const err = await res.json();
-                alert(`Failed to update working days: ${err.detail || 'Unknown error'}`);
-            }
-        } catch (error) {
-            alert('Server communication error.');
-        }
-    });
-}
+
 
 // HR Log Attendance Global Helper
 window.markTeacherAttendance = async function(username, status) {
@@ -2745,17 +2705,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-
     const leaveApplicationForm = document.getElementById('leave-application-form');
     if (leaveApplicationForm) {
         leaveApplicationForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const dateInput = document.getElementById('leave-date-input');
             const typeSelect = document.getElementById('leave-type-select');
-            const titleInput = document.getElementById('leave-title-input');
             const descInput = document.getElementById('leave-desc-input');
             
-            if (!dateInput || !typeSelect || !dateInput.value || !typeSelect.value || !titleInput || !titleInput.value || !descInput || !descInput.value) {
+            if (!dateInput || !typeSelect || !dateInput.value || !typeSelect.value || !descInput || !descInput.value) {
                 alert('Please fill out all required fields.');
                 return;
             }
@@ -2764,7 +2722,7 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('username', currentUser);
             formData.append('leave_date', dateInput.value);
             formData.append('leave_type', typeSelect.value);
-            formData.append('title', titleInput.value.trim());
+            formData.append('title', typeSelect.value);
             formData.append('description', descInput.value.trim());
             if (leaveFileInput && leaveFileInput.files && leaveFileInput.files.length > 0) {
                 formData.append('file', leaveFileInput.files[0]);
@@ -2787,7 +2745,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (res.ok) {
                     dateInput.value = '';
                     typeSelect.value = '';
-                    titleInput.value = '';
                     descInput.value = '';
                     if (leaveFileInput) leaveFileInput.value = '';
                     if (leaveFileName) leaveFileName.innerText = 'No file selected';
@@ -4221,7 +4178,7 @@ async function loadHrSalaryList() {
         }
 
         const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
-        const BASE_WORKING_DAYS = 22; // Assumed fixed working days
+        const BASE_WORKING_DAYS = data.global_working_days !== undefined ? data.global_working_days : 26;
         const PER_DAY_WAGE = 3400;
 
         for (const [username, details] of Object.entries(data.teachers)) {
