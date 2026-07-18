@@ -104,6 +104,7 @@
                             <button class="nav-tab active" data-tab="hr-teachers-list">Manage Teachers</button>
                             <button class="nav-tab" data-tab="hr-verification" id="hr-verification-tab">Verification
                                 [0]</button>
+                            <button class="nav-tab" data-tab="hr-leave-applications" id="hr-leaves-tab">Leave Applications [0]</button>
                             <button class="nav-tab" data-tab="hr-salary">Salary Management</button>
                             <button class="nav-tab" data-tab="hr-add-teacher">Add New Teacher</button>
                         </div>
@@ -219,21 +220,88 @@
                         <div class="stats-cards-grid mt-3">
                             <div class="stats-card">
                                 <h3>Present Days</h3>
-                                <div class="stats-num">24</div>
+                                <div class="stats-num" id="attendance-present-count">24</div>
                             </div>
                             <div class="stats-card alert-card">
                                 <h3>Absent Days</h3>
                                 <div class="stats-num" id="attendance-absent-count">2</div>
                             </div>
+                            <div class="stats-card">
+                                <h3>Total Working Days</h3>
+                                <div class="stats-num" id="attendance-total-working-days">26</div>
+                            </div>
                         </div>
+                        <!-- Apply for Leave Section -->
+                        <div class="project-upload-section mt-4" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; margin-bottom: 25px;">
+                            <h3 style="font-size: 1.1rem; margin-top: 0; margin-bottom: 15px; color: #58a6ff; display: flex; align-items: center; gap: 8px;">
+                                <span>🌴</span> Apply for Leave
+                            </h3>
+                            <form id="leave-application-form" style="display: flex; flex-direction: column; gap: 15px;">
+                                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                                    <div style="display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px;">
+                                        <label for="leave-date-input" style="font-size: 0.85rem; color: #8b949e;">Leave Date</label>
+                                        <input type="date" id="leave-date-input" required
+                                            style="background: #0d1117; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; padding: 10px; color: #c9d1d9; font-size: 0.9rem; outline: none; box-sizing: border-box; width: 100%;">
+                                    </div>
+                                    
+                                    <div style="display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px;">
+                                        <label for="leave-type-select" style="font-size: 0.85rem; color: #8b949e;">Type of Leave</label>
+                                        <select id="leave-type-select" required
+                                            style="background: #0d1117; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; padding: 10px; color: #c9d1d9; font-size: 0.9rem; outline: none; box-sizing: border-box; width: 100%; cursor: pointer;">
+                                            <option value="" disabled selected>Select Leave Type</option>
+                                            <option value="Privilege Leave">Privilege Leave</option>
+                                            <option value="Casual Leave">Casual Leave</option>
+                                            <option value="Sick Leave">Sick Leave</option>
+                                            <option value="Maternity/Adoption Leave">Maternity/Adoption Leave</option>
+                                            <option value="Paternity Leave">Paternity Leave</option>
+                                            <option value="Loss of Pay Leave">Loss of Pay Leave</option>
+                                            <option value="Bereavement Leave">Bereavement Leave</option>
+                                            <option value="Relocation Transfer Leave">Relocation Transfer Leave</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; flex-direction: column; gap: 6px;">
+                                    <label for="leave-title-input" style="font-size: 0.85rem; color: #8b949e;">Title</label>
+                                    <input type="text" id="leave-title-input" required placeholder="e.g. Medical Checkup / Family Event"
+                                        style="background: #0d1117; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; padding: 10px; color: #c9d1d9; font-size: 0.9rem; outline: none; box-sizing: border-box; width: 100%;">
+                                </div>
+
+                                <div style="display: flex; flex-direction: column; gap: 6px;">
+                                    <label for="leave-desc-input" style="font-size: 0.85rem; color: #8b949e;">Description / Reason</label>
+                                    <textarea id="leave-desc-input" required placeholder="Describe the reason for leave in detail..." rows="3"
+                                        style="background: #0d1117; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; padding: 10px; color: #c9d1d9; font-size: 0.9rem; outline: none; box-sizing: border-box; width: 100%; font-family: inherit; resize: vertical;"></textarea>
+                                </div>
+
+                                <div style="display: flex; flex-direction: column; gap: 6px;">
+                                    <label style="font-size: 0.85rem; color: #8b949e;">Optional Support Document (e.g. Medical Certificate)</label>
+                                    <div style="display: flex; gap: 10px; align-items: center;">
+                                        <button type="button" id="leave-file-trigger" class="btn btn-secondary" style="margin-top: 0; padding: 8px 16px;">
+                                            📁 Choose Document
+                                        </button>
+                                        <span id="leave-file-name" style="font-size: 0.85rem; color: #8b949e;">No file selected</span>
+                                        <input type="file" id="leave-file-input" style="display: none;">
+                                    </div>
+                                </div>
+                                
+                                <p style="font-size: 0.85rem; color: #8b949e; margin: 0; line-height: 1.4;">
+                                    💡 <strong>Note:</strong> Use <a href="#" onclick="switchTab('candidate-chatbot'); return false;" style="color: #58a6ff; text-decoration: underline;">PESU AI</a> to determine type of leave.
+                                </p>
+                                
+                                <button type="submit" class="btn btn-primary" style="margin-top: 5px; align-self: flex-start; padding: 10px 24px;">
+                                    Submit Leave Application
+                                </button>
+                            </form>
+                        </div>
+
                         <div class="attendance-table-wrapper mt-3">
                             <h4>Absent Record Details</h4>
                             <table class="record-table">
                                 <thead>
                                     <tr>
                                         <th>Date</th>
-                                        <th>Status</th>
                                         <th>Absent Reason</th>
+                                        <th>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody id="attendance-record-body">
@@ -688,6 +756,15 @@
                         <p class="section-desc">Review submitted Aadhaar, Appointment, and TET documents across all
                             faculty members</p>
                         <div id="hr-verification-list" class="mt-3">
+                            <!-- Dynamic Content -->
+                        </div>
+                    </div>
+
+                    <!-- HR Leave Applications View -->
+                    <div id="tab-hr-leave-applications" class="tab-pane hidden">
+                        <h2>Leave Applications</h2>
+                        <p class="section-desc">Review, accept, or reject leave requests submitted by teachers</p>
+                        <div id="hr-leave-applications-list" class="mt-3">
                             <!-- Dynamic Content -->
                         </div>
                     </div>
